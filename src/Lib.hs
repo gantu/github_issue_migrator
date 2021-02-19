@@ -5,4 +5,4 @@ module Lib
 import Fetcher
 
 someFunc :: IO ()
-someFunc = fetch 
+someFunc = migrate 

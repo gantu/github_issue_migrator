@@ -11,7 +11,7 @@ import Data.Maybe (fromJust)
 import Control.Monad (forM_)
 
 data Issue = Issue { title :: String
-		   , body :: String
+                   , body :: String
                    } deriving (Show)
 
 instance FromJSON Issue where
@@ -27,27 +27,33 @@ instance ToJSON Issue where
       , "body" .= body
       ]
 
-fetch :: IO ()
-fetch = do
+fetchData :: IO (Maybe [Issue])
+fetchData = do
+  let request = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
+              $ setRequestHeader "User-Agent" ["request"]
+              $ setRequestHeader "Authorization" ["token OAUTHToken"]
+              $ "GET https://api.github.com/repos/{owner}/{repo_name}/issues"
+  response <- httpJSON request             
+                                          
+  let decodedData = encode (getResponseBody response :: Value)
+  return (decode decodedData :: Maybe [Issue])
+  
 
-    let request = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
-    		$ setRequestHeader "User-Agent" ["request"]
-		$ setRequestHeader "Authorization" ["token OAUTHToken"]
-                $ "GET https://api.github.com/repos/{owner}/{reponame}/issues"
-    response <- httpJSON request
-   
-    let yamlData = Yaml.encode (getResponseBody response :: Value)
-        decodedData = Yaml.decode yamlData :: Maybe [Issue]
+createIssues :: Maybe [Issue] -> IO ()
+createIssues issues = do
+  case issues of
+    Nothing -> putStrLn $ "No issue to create!"
+    Just issueList -> forM_ issueList $ \issue -> do
+      let request = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
+                  $ setRequestHeader "User-Agent" ["request"]   
+                  $ setRequestHeader "Authorization" ["token OAUTHToken"]
+                  $ setRequestBodyJSON issue                 
+                  $ "POST https://api.github.com/repos/{owner}/{reponame}/issues"
+      response <- httpJSON request                          
+      S8.putStrLn $ Yaml.encode (getResponseBody response :: Value) 
 
-    case decodedData of
-    	Nothing -> putStrLn $ "No Data in response"
-	Just issues -> forM_ issues $ \issue -> do
-		let request' = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
-			     $ setRequestHeader "User-Agent" ["request"]
-			     $ setRequestHeader "Authorization" ["token OAUTHToken"]
-		             $ setRequestBodyJSON issue 
-                             $ "POST https://api.github.com/repos/{owner}/{reponame}/issues"
-		response' <- httpJSON request' 
-		S8.putStrLn $ Yaml.encode (getResponseBody response' :: Value)
+migrate :: IO ()
+migrate = do
 
-    putStrLn $ show decodedData
+  fetchedData <- fetchData
+  createIssues fetchedData
