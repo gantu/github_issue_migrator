@@ -27,33 +27,34 @@ instance ToJSON Issue where
       , "body" .= body
       ]
 
-fetchData :: IO (Maybe [Issue])
-fetchData = do
-  let request = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
-              $ setRequestHeader "User-Agent" ["request"]
-              $ setRequestHeader "Authorization" ["token OAUTHToken"]
-              $ "GET https://api.github.com/repos/{owner}/{repo_name}/issues"
-  response <- httpJSON request             
-                                          
-  let decodedData = encode (getResponseBody response :: Value)
+makeRequest :: String -> String -> IO (Maybe [Issue])
+makeRequest owner repo = do
+  initReq <- parseRequest $ "GET https://api.github.com/repos/"++owner++"/"++repo++"/issues"
+  let req = setRequestHeader "Accept" ["application/vnd.github.v3+json"]                                          
+          $ setRequestHeader "User-Agent" ["request"]                                                             
+          $ setRequestHeader "Authorization" ["token OAUTHToken"]
+          $ initReq
+  response <- httpJSON req
+  let decodedData = encode (getResponseBody response :: Value)                                                        
   return (decode decodedData :: Maybe [Issue])
-  
 
-createIssues :: Maybe [Issue] -> IO ()
-createIssues issues = do
+
+createIssues :: String -> String -> Maybe [Issue] -> IO ()
+createIssues owner repo issues = do
   case issues of
     Nothing -> putStrLn $ "No issue to create!"
     Just issueList -> forM_ issueList $ \issue -> do
+      initReq <- parseRequest $ "POST https://api.github.com/repos/"++owner++"/"++repo++"/issues"
       let request = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
                   $ setRequestHeader "User-Agent" ["request"]   
                   $ setRequestHeader "Authorization" ["token OAUTHToken"]
                   $ setRequestBodyJSON issue                 
-                  $ "POST https://api.github.com/repos/{owner}/{reponame}/issues"
+                  $ initReq
       response <- httpJSON request                          
       S8.putStrLn $ Yaml.encode (getResponseBody response :: Value) 
 
 migrate :: IO ()
 migrate = do
-
-  fetchedData <- fetchData
-  createIssues fetchedData
+  fetchedData <- makeRequest "gantu" "spring_sample_project"
+  createIssues "gantu" "spring_sample_project1" fetchedData
+ -- putStrLn $ show (fetchedData)
